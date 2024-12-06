@@ -1,7 +1,7 @@
 import random
 from typing import List
 
-from src.gametypes import Policy, Role
+from src.game_types import Policy, Role
 from src.players import ComputerPlayer, Player, TerminalPlayer
 
 LIBERAL_POLICY_COUNT = 6
