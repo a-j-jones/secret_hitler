@@ -49,25 +49,39 @@ class Player(BaseModel, ABC):
     def action_policy_peek(self, game_state: GameState, policies: List["Policy"]) -> None:
         pass
 
+    def __str__(self) -> str:
+        return self.name
+
+
+def get_choice_idx(title_message: str, input_message: str, choices: List[Player | Policy]) -> int:
+    print(f"\n{title_message}")
+    for i, choice in enumerate(choices, start=1):
+        print(f"\t{i} - {choice}")
+
+    while True:
+        try:
+            choice = input(f"\n{input_message} ")
+            choice_idx = int(choice) - 1
+            if 0 <= choice_idx <= len(choices) - 1:
+                return choice_idx
+
+            print(f"Please enter a number between 1 and {len(choices)}")
+        except ValueError:
+            print("Please enter a valid number")
+
 
 class HumanPlayer(Player):
-    def nominate_chancellor(self, game_state: GameState, valid_players: List["Player"]) -> "Player":
-        print(f"\n{self.name} - Nominate a chancellor:")
-        for i, player in enumerate(valid_players, start=1):
-            print(f"\t{i} - {player.name}")
+    def nominate_chancellor(self, game_state: GameState, valid_players: List[Player]) -> Player:
+        choice_idx = get_choice_idx(
+            title_message=f"{self.name} - Nominate a chancellor:",
+            input_message="Which player?",
+            choices=valid_players,
+        )
 
-        while True:
-            try:
-                choice = input("\nWhich player? ")
-                choice_index = int(choice)
-                if 1 <= choice_index <= len(valid_players):
-                    return valid_players[choice_index - 1]
-                print(f"Please enter a number between 1 and {len(valid_players)}")
-            except ValueError:
-                print("Please enter a valid number")
+        return valid_players[choice_idx]
 
     def vote_on_government(
-        self, game_state: GameState, president: "Player", chancellor: "Player"
+        self, game_state: GameState, president: Player, chancellor: Player
     ) -> bool:
         while True:
             vote = input(
@@ -78,54 +92,32 @@ class HumanPlayer(Player):
             print("Please enter 'y' or 'n'")
 
     def propose_policies(self, game_state: GameState, policy_cards: List[Policy]) -> Selection:
-        print(f"\n{self.name} - Choose policies to discard (you must discard one):")
-        for i, policy in enumerate(policy_cards, start=1):
-            print(f"\t{i} - {policy}")
+        choice_idx = get_choice_idx(
+            title_message=f"{self.name} - Choose policies to discard (you must discard one):",
+            input_message="Which policy to discard (1-3)?",
+            choices=policy_cards,
+        )
 
-        while True:
-            try:
-                choice = input("\nWhich policy to discard (1-3)? ")
-                choice_idx = int(choice)
-                if 1 <= choice_idx <= len(policy_cards):
-                    discarded = [policy_cards.pop(choice_idx - 1)]
-                    return Selection(selected=policy_cards, discarded=discarded)
-                print(f"Please enter a number between 1 and {len(policy_cards)}")
-            except ValueError:
-                print("Please enter a valid number")
+        discarded = [policy_cards.pop(choice_idx)]
+        return Selection(selected=policy_cards, discarded=discarded)
 
     def enact_policy(self, game_state: GameState, policy_cards: List[Policy]) -> Policy:
-        print(f"\n{self.name} - Choose a policy to enact:")
-        for i, policy in enumerate(policy_cards, start=1):
-            print(f"\t{i} - {policy}")
+        choice_idx = get_choice_idx(
+            title_message=f"{self.name} - Choose a policy to enact:",
+            input_message="Which policy to discard (1-2)?",
+            choices=policy_cards,
+        )
+        selected = [policy_cards.pop(choice_idx)]
+        return Selection(selected=selected, discarded=policy_cards)
 
-        while True:
-            try:
-                choice = input("\nWhich policy to enact (1-2)? ")
-                choice_idx = int(choice)
-                if 1 <= choice_idx <= len(policy_cards):
-                    selected = [policy_cards.pop(choice_idx - 1)]
-                    return Selection(selected=selected, discarded=policy_cards)
-                print(f"Please enter a number between 1 and {len(policy_cards)}")
-            except ValueError:
-                print("Please enter a valid number")
+    def action_investigate_loyalty(self, game_state: GameState, valid_players: List[Player]):
+        choice_idx = get_choice_idx(
+            title_message=f"{self.name} - Choose a player to investigate:",
+            input_message="Which player?",
+            choices=valid_players,
+        )
 
-    def action_investigate_loyalty(self, game_state, players):
-        print(f"\n{self.name} - Choose a player to investigate:")
-        for i, player in enumerate(players, start=1):
-            print(f"\t{i} - {player.name}")
-
-        while True:
-            try:
-                choice = input("\nWhich player? ")
-                choice_index = int(choice)
-                if 1 <= choice_index <= len(players):
-                    player = players[choice_index - 1]
-                    break
-
-                print(f"Please enter a number between 1 and {len(players)}")
-            except ValueError:
-                print("Please enter a valid number")
-
+        player = valid_players[choice_idx]
         print(f"{player.name} is a {player.party}")
 
     def action_execution(self, game_state, players):

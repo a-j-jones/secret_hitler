@@ -97,7 +97,7 @@ class Game:
         match fascist_count:
             case 3:
                 player.action_investigate_loyalty(
-                    1, players=[p for p in self.valid_players() if p != player]
+                    1, valid_players=[p for p in self.valid_players() if p != player]
                 )
             case 4:
                 return
