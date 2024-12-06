@@ -2,7 +2,7 @@ import random
 from typing import List
 
 from src.gametypes import Policy, Role
-from src.players import ComputerPlayer, HumanPlayer, Player
+from src.players import ComputerPlayer, Player, TerminalPlayer
 
 LIBERAL_POLICY_COUNT = 6
 FASCIST_POLICY_COUNT = 11
@@ -55,7 +55,7 @@ class Game:
                 role = Role.fascist
 
             if name in self.human_set:
-                player_class = HumanPlayer
+                player_class = TerminalPlayer
             else:
                 player_class = ComputerPlayer
 
@@ -70,17 +70,23 @@ class Game:
 
         return True
 
-    def valid_players(self) -> List[Player]:
-        return [p for p in self.players if p.alive]
+    def valid_players(self, exclude: Player | List[Player] = None) -> List[Player]:
+        if exclude is None:
+            exclude = []
+        if isinstance(exclude, Player):
+            exclude = [exclude]
+
+        return [p for p in self.players if p.alive and p not in exclude]
 
     def valid_voters(self, president: Player, chancellor: Player) -> List[Player]:
-        return [p for p in self.valid_players() if p not in [president, chancellor]]
+        invalid_choices = [president, chancellor]
+        return self.valid_players(exclude=invalid_choices)
 
     def valid_chancellors(
         self, president: Player, previous_president: Player, previous_chancellor: Player
     ) -> List[Player]:
         invalid_choices = [president, previous_president, previous_chancellor]
-        return [p for p in self.valid_players() if p not in invalid_choices]
+        return self.valid_players(exclude=invalid_choices)
 
     def draw_policies(self) -> List[Policy]:
         if len(self.policy_deck) < 3:
@@ -96,15 +102,16 @@ class Game:
         fascist_count = self.enacted_policies[Policy.fascist]
         match fascist_count:
             case 3:
-                player.action_investigate_loyalty(
-                    1, valid_players=[p for p in self.valid_players() if p != player]
-                )
+                player.action_investigate_loyalty(1, players=self.valid_players(exclude=player))
             case 4:
-                return
+                player.action_execution(1, players=self.valid_players(exclude=player))
             case 5:
-                return
+                player.action_policy_peek(1, self.policy_deck)
             case _:
                 return
+
+    def print_gamestate(self) -> None:
+        pass
 
     def play_game(self) -> None:
         elected_chancellor = None
@@ -113,17 +120,17 @@ class Game:
         game_state = 1
         turn_num = 0
         while True:
-            # Current state:
-            print(f"\n{' NEW ROUND ':-^80}")
-            print(
-                f"\nFacist policies: {self.enacted_policies[Policy.fascist]} / Liberal policies: {self.enacted_policies[Policy.liberal]}"
-            )
-
             # Cycle president:
             nominated_president = self.players[turn_num % len(self.players)]
             if not self.valid_president(nominated_president):
                 turn_num += 1
                 continue
+
+            # Current state:
+            print(f"\n{' NEW ROUND ':-^80}")
+            print(
+                f"\nFacist policies: {self.enacted_policies[Policy.fascist]} / Liberal policies: {self.enacted_policies[Policy.liberal]}"
+            )
 
             # Nominate a chancellor:
             print("President: ", nominated_president.name)

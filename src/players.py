@@ -20,7 +20,7 @@ class Player(BaseModel, ABC):
     model_config = ConfigDict(use_enum_values=True)
 
     @abstractmethod
-    def nominate_chancellor(self, game_state: GameState, valid_players: List["Player"]) -> "Player":
+    def nominate_chancellor(self, game_state: GameState, players: List["Player"]) -> "Player":
         pass
 
     @abstractmethod
@@ -70,15 +70,15 @@ def get_choice_idx(title_message: str, input_message: str, choices: List[Player 
             print("Please enter a valid number")
 
 
-class HumanPlayer(Player):
-    def nominate_chancellor(self, game_state: GameState, valid_players: List[Player]) -> Player:
+class TerminalPlayer(Player):
+    def nominate_chancellor(self, game_state: GameState, players: List[Player]) -> Player:
         choice_idx = get_choice_idx(
             title_message=f"{self.name} - Nominate a chancellor:",
             input_message="Which player?",
-            choices=valid_players,
+            choices=players,
         )
 
-        return valid_players[choice_idx]
+        return players[choice_idx]
 
     def vote_on_government(
         self, game_state: GameState, president: Player, chancellor: Player
@@ -110,21 +110,31 @@ class HumanPlayer(Player):
         selected = [policy_cards.pop(choice_idx)]
         return Selection(selected=selected, discarded=policy_cards)
 
-    def action_investigate_loyalty(self, game_state: GameState, valid_players: List[Player]):
+    def action_investigate_loyalty(self, game_state: GameState, players: List[Player]):
         choice_idx = get_choice_idx(
             title_message=f"{self.name} - Choose a player to investigate:",
             input_message="Which player?",
-            choices=valid_players,
+            choices=players,
         )
 
-        player = valid_players[choice_idx]
+        player = players[choice_idx]
         print(f"{player.name} is a {player.party}")
 
-    def action_execution(self, game_state, players):
-        return super().action_execution(game_state, players)
+    def action_execution(self, game_state: GameState, players: List[Player]):
+        choice_idx = get_choice_idx(
+            title_message=f"{self.name} - Choose a player to execute:",
+            input_message="Which player?",
+            choices=players,
+        )
 
-    def action_policy_peek(self, game_state, policies):
-        return super().action_policy_peek(game_state, policies)
+        player = players[choice_idx]
+        player.alive = False
+        print(f"{player.name} has been killed")
+
+    def action_policy_peek(self, game_state: GameState, policy_cards: List[Policy]) -> None:
+        print("\nThe next 3 policies are:")
+        for idx, card in enumerate(policy_cards[-3:], start=1):
+            print(f"{idx} - {card}")
 
 
 class ComputerPlayer(Player):
