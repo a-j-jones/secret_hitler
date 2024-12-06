@@ -3,7 +3,7 @@ from typing import List
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.gametypes import Party, Policy, Role
+from src.gametypes import Policy, Role, Selection
 
 
 class GameState:
@@ -13,7 +13,7 @@ class GameState:
 
 class Player(BaseModel, ABC):
     name: str
-    party: Party
+    party: Policy
     role: Role
     alive: bool = Field(default=True)
 
@@ -30,23 +30,35 @@ class Player(BaseModel, ABC):
         pass
 
     @abstractmethod
-    def propose_policies(self, game_state: GameState, policy_cards: List[Policy]) -> List[Policy]:
+    def propose_policies(self, game_state: GameState, policy_cards: List[Policy]) -> Selection:
         pass
 
     @abstractmethod
-    def enact_policy(self, game_state: GameState, policy_cards: List[Policy]) -> Policy:
+    def enact_policy(self, game_state: GameState, policy_cards: List[Policy]) -> Selection:
+        pass
+
+    @abstractmethod
+    def action_investigate_loyalty(self, game_state: GameState, players: List["Player"]) -> None:
+        pass
+
+    @abstractmethod
+    def action_execution(self, game_state: GameState, players: List["Player"]) -> None:
+        pass
+
+    @abstractmethod
+    def action_policy_peek(self, game_state: GameState, policies: List["Policy"]) -> None:
         pass
 
 
 class HumanPlayer(Player):
     def nominate_chancellor(self, game_state: GameState, valid_players: List["Player"]) -> "Player":
-        print("Nominate a chancellor:")
+        print(f"\n{self.name} - Nominate a chancellor:")
         for i, player in enumerate(valid_players, start=1):
             print(f"\t{i} - {player.name}")
 
         while True:
             try:
-                choice = input("Which player? ")
+                choice = input("\nWhich player? ")
                 choice_index = int(choice)
                 if 1 <= choice_index <= len(valid_players):
                     return valid_players[choice_index - 1]
@@ -59,41 +71,68 @@ class HumanPlayer(Player):
     ) -> bool:
         while True:
             vote = input(
-                f"Vote on government (president: {president.name}, chancellor: {chancellor.name}) [y/n]? "
+                f"f\n{self.name} - Vote on government (president: {president.name}, chancellor: {chancellor.name}) [y/n]? "
             ).lower()
             if vote in ["y", "n"]:
                 return vote == "y"
             print("Please enter 'y' or 'n'")
 
-    def propose_policies(self, game_state: GameState, policy_cards: List[Policy]) -> List[Policy]:
-        print("Choose policies to discard (you must discard one):")
+    def propose_policies(self, game_state: GameState, policy_cards: List[Policy]) -> Selection:
+        print(f"\n{self.name} - Choose policies to discard (you must discard one):")
         for i, policy in enumerate(policy_cards, start=1):
             print(f"\t{i} - {policy}")
 
         while True:
             try:
-                choice = input("Which policy to discard (1-3)? ")
-                choice_index = int(choice)
-                if 1 <= choice_index <= len(policy_cards):
-                    return [p for i, p in enumerate(policy_cards) if i != choice_index - 1]
+                choice = input("\nWhich policy to discard (1-3)? ")
+                choice_idx = int(choice)
+                if 1 <= choice_idx <= len(policy_cards):
+                    discarded = [policy_cards.pop(choice_idx - 1)]
+                    return Selection(selected=policy_cards, discarded=discarded)
                 print(f"Please enter a number between 1 and {len(policy_cards)}")
             except ValueError:
                 print("Please enter a valid number")
 
     def enact_policy(self, game_state: GameState, policy_cards: List[Policy]) -> Policy:
-        print("Choose a policy to enact:")
+        print(f"\n{self.name} - Choose a policy to enact:")
         for i, policy in enumerate(policy_cards, start=1):
             print(f"\t{i} - {policy}")
 
         while True:
             try:
-                choice = input("Which policy to enact (1-2)? ")
-                choice_index = int(choice)
-                if 1 <= choice_index <= len(policy_cards):
-                    return policy_cards[choice_index - 1]
+                choice = input("\nWhich policy to enact (1-2)? ")
+                choice_idx = int(choice)
+                if 1 <= choice_idx <= len(policy_cards):
+                    selected = [policy_cards.pop(choice_idx - 1)]
+                    return Selection(selected=selected, discarded=policy_cards)
                 print(f"Please enter a number between 1 and {len(policy_cards)}")
             except ValueError:
                 print("Please enter a valid number")
+
+    def action_investigate_loyalty(self, game_state, players):
+        print(f"\n{self.name} - Choose a player to investigate:")
+        for i, player in enumerate(players, start=1):
+            print(f"\t{i} - {player.name}")
+
+        while True:
+            try:
+                choice = input("\nWhich player? ")
+                choice_index = int(choice)
+                if 1 <= choice_index <= len(players):
+                    player = players[choice_index - 1]
+                    break
+
+                print(f"Please enter a number between 1 and {len(players)}")
+            except ValueError:
+                print("Please enter a valid number")
+
+        print(f"{player.name} is a {player.party}")
+
+    def action_execution(self, game_state, players):
+        return super().action_execution(game_state, players)
+
+    def action_policy_peek(self, game_state, policies):
+        return super().action_policy_peek(game_state, policies)
 
 
 class ComputerPlayer(Player):

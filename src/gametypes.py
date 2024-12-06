@@ -1,4 +1,7 @@
 from enum import StrEnum
+from typing import List
+
+from pydantic import BaseModel
 
 
 class Party(StrEnum):
@@ -6,8 +9,9 @@ class Party(StrEnum):
     fascist = "Fascist"
 
 
-class Policy(type(Party)):
-    pass
+class Policy(StrEnum):
+    liberal = "Liberal"
+    fascist = "Fascist"
 
 
 class Role(StrEnum):
@@ -19,3 +23,8 @@ class Role(StrEnum):
 class PlayerType(StrEnum):
     human = "Human"
     ai = "AI"
+
+
+class Selection(BaseModel):
+    selected: List[Policy]
+    discarded: List[Policy]
