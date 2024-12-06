@@ -1,6 +1,7 @@
 import random
 from typing import List
 
+from src.game_state import GameState
 from src.game_types import Policy, Role
 from src.players import ComputerPlayer, Player, TerminalPlayer
 
@@ -20,9 +21,9 @@ class Game:
         # Create deck(s) and track the policies played:
         self.policy_deck = self.create_policy_deck()
         self.discard_deck = []
-        self.enacted_policies = {Policy.liberal: 0, Policy.fascist: 0}
 
         self.players = self.assign_roles(all_players)
+        self.state = GameState()
 
     def create_policy_deck(self) -> List[Policy]:
         policy_deck = []
@@ -99,7 +100,7 @@ class Game:
         return hand
 
     def take_action(self, player: Player) -> None:
-        fascist_count = self.enacted_policies[Policy.fascist]
+        fascist_count = self.state.enacted_policies[Policy.fascist]
         match fascist_count:
             case 3:
                 player.action_investigate_loyalty(1, players=self.valid_players(exclude=player))
@@ -111,13 +112,15 @@ class Game:
                 return
 
     def print_gamestate(self) -> None:
-        pass
+        if self.state.chancellor is not None:
+            print("Previous government:")
+            print(f"\tPresident: {self.state.president} / Chancellor: {self.state.chancellor}")
+
+        print(
+            f"\tFacist policies: {self.state.enacted_policies[Policy.fascist]} / Liberal policies: {self.state.enacted_policies[Policy.liberal]}"
+        )
 
     def play_game(self) -> None:
-        elected_chancellor = None
-        elected_president = None
-
-        game_state = 1
         turn_num = 0
         while True:
             # Cycle president:
@@ -128,52 +131,50 @@ class Game:
 
             # Current state:
             print(f"\n{' NEW ROUND ':-^80}")
-            print(
-                f"\nFacist policies: {self.enacted_policies[Policy.fascist]} / Liberal policies: {self.enacted_policies[Policy.liberal]}"
-            )
+            self.print_gamestate()
 
             # Nominate a chancellor:
-            print("President: ", nominated_president.name)
-            print(
-                f"Valid chancellors = ({', '.join([x.name for x in self.valid_chancellors(nominated_president, elected_president, elected_chancellor)])})"
-            )
+            print("\nPresident: ", nominated_president.name)
             nominated_chancellor = nominated_president.nominate_chancellor(
-                game_state,
-                self.valid_chancellors(nominated_president, elected_president, elected_chancellor),
+                self.state,
+                self.valid_chancellors(
+                    nominated_president, self.state.president, self.state.chancellor
+                ),
             )
 
             # Vote in the current government:
             voters = self.valid_voters(nominated_president, nominated_chancellor)
             # votes = [
-            #     p.vote_on_government(game_state, nominated_president, nominated_chancellor)
+            #     p.vote_on_government(self.state, nominated_president, nominated_chancellor)
             #     for p in voters
             # ]
             votes = [True for v in voters]
             if sum(votes) > len(votes) // 2:
                 print("The government was elected successfully")
-                elected_chancellor = nominated_chancellor
-                elected_president = nominated_president
-                nominated_chancellor = None
-                nominated_president = None
+                self.state.elect_government(
+                    chancellor=nominated_chancellor, president=nominated_president
+                )
             else:
                 print("The government was not elected")
                 continue
 
             # President selects policy options:
             policy_options = self.draw_policies()
-            policy_proposal = elected_president.propose_policies(game_state, policy_options)
+            policy_proposal = self.state.president.propose_policies(self.state, policy_options)
             self.discard_deck.extend(policy_proposal.discarded)
 
             # Chancellor enacts policy:
-            policy_selection = elected_chancellor.enact_policy(game_state, policy_proposal.selected)
+            policy_selection = self.state.chancellor.enact_policy(
+                self.state, policy_proposal.selected
+            )
             self.discard_deck.extend(policy_selection.discarded)
             policy = policy_selection.selected[0]
 
-            self.enacted_policies[policy] += 1
+            self.state.enacted_policies[policy] += 1
 
             # Action to be taken:
             if policy == Policy.fascist:
-                self.take_action(elected_president)
+                self.take_action(self.state.president)
 
             turn_num += 1
             if turn_num > 10:

@@ -116,7 +116,7 @@ class TerminalPlayer(Player):
         )
 
         player = players[choice_idx]
-        print(f"{player.name} is a {player.party}")
+        print(f"\n{player.name} is a {player.party}")
 
     def action_execution(self, game_state: "GameState", players: List[Player]):
         choice_idx = get_choice_idx(
@@ -127,7 +127,7 @@ class TerminalPlayer(Player):
 
         player = players[choice_idx]
         player.alive = False
-        print(f"{player.name} has been killed")
+        print(f"\n{player.name} has been killed")
 
     def action_policy_peek(self, game_state: "GameState", policy_cards: List[Policy]) -> None:
         print("\nThe next 3 policies are:")
