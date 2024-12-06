@@ -7,6 +7,6 @@ if __name__ == "__main__":
 
     print("Players:")
     for player in game.players:
-        print(player)
+        print(repr(player))
 
     game.play_game()

@@ -1,3 +1,4 @@
+import datetime as dt
 from enum import StrEnum
 from typing import List
 
@@ -28,3 +29,9 @@ class PlayerType(StrEnum):
 class Selection(BaseModel):
     selected: List[Policy]
     discarded: List[Policy]
+
+
+class Message(BaseModel):
+    time: dt.datetime
+    author: str
+    content: str
