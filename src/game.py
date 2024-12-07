@@ -15,8 +15,11 @@ POLICIES_FOR_HITLER_CHANCELLOR = 3
 
 
 class Game:
-    def __init__(self, human_players: List[str], ai_players: List[str]) -> None:
+    def __init__(
+        self, human_players: List[str], ai_players: List[str], debug: bool = False
+    ) -> None:
         self.state = GameState()
+        self.debug = debug
 
         # Validate and assign player roles
         self.human_set = set(human_players)
@@ -99,12 +102,12 @@ class Game:
         invalid_choices = [president, previous_president, previous_chancellor]
         return self.valid_players(exclude=invalid_choices)
 
-    def draw_policies(self) -> List[Policy]:
-        if len(self.policy_deck) < 3:
+    def draw_policies(self, amount: int = 3) -> List[Policy]:
+        if len(self.policy_deck) < amount:
             self.reshuffle_deck()
 
         hand = []
-        for _ in range(3):
+        for _ in range(amount):
             hand.append(self.policy_deck.pop())
 
         return hand
@@ -173,11 +176,13 @@ class Game:
 
             # Vote in the current government:
             voters = self.valid_voters(nominated_president, nominated_chancellor)
-            # votes = [
-            #     p.vote_on_government(self.state, nominated_president, nominated_chancellor)
-            #     for p in voters
-            # ]
-            votes = [True for v in voters]
+            if self.debug:
+                votes = [True for _ in voters]
+            else:
+                votes = [
+                    p.vote_on_government(self.state, nominated_president, nominated_chancellor)
+                    for p in voters
+                ]
             if sum(votes) > len(votes) // 2:
                 print("The government was elected successfully")
                 self.state.elect_government(
@@ -185,6 +190,17 @@ class Game:
                 )
             else:
                 print("The government was not elected")
+                self.state.failed_elections += 1
+                if self.state.failed_elections == 3:
+                    self.state.failed_elections = 0
+                    policy = self.draw_policies(amount=1)
+                    self.state.enacted_policies[policy] += 1
+
+                    if win := self.check_win():
+                        party, reason = win
+                        print(f"The {party}s win the game!, {reason}")
+                        break
+
                 continue
 
             if win := self.check_win():
