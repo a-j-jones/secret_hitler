@@ -19,5 +19,4 @@ Secret Hitler Online is licensed under [Creative Commons BY-NC-SA 4.0](https://c
 *(This project is not affiliated with or endorsed by Goat, Wolf & Cabbage.)*
 
 #### What's changed from the original?
-![](https://i.postimg.cc/cCNCZxw2/show-votes.gif)
 - Code features game logic only at the moment, and tries to faithfully recreate the rules of the game.
