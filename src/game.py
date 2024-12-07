@@ -1,16 +1,23 @@
 import random
-from typing import List
+from typing import List, Tuple, Union
 
 from src.game_state import GameState
-from src.game_types import Policy, Role
+from src.game_types import Party, Policy, Role
 from src.players import ComputerPlayer, Player, TerminalPlayer
 
 LIBERAL_POLICY_COUNT = 6
 FASCIST_POLICY_COUNT = 11
 
+LIBERAL_POLICIES_WIN = 5
+FASCIST_POLICIES_WIN = 6
+
+POLICIES_FOR_HITLER_CHANCELLOR = 3
+
 
 class Game:
     def __init__(self, human_players: List[str], ai_players: List[str]) -> None:
+        self.state = GameState()
+
         # Validate and assign player roles
         self.human_set = set(human_players)
         self.ai_set = set(ai_players)
@@ -23,7 +30,6 @@ class Game:
         self.discard_deck = []
 
         self.players = self.assign_roles(all_players)
-        self.state = GameState()
 
     def create_policy_deck(self) -> List[Policy]:
         policy_deck = []
@@ -60,7 +66,11 @@ class Game:
             else:
                 player_class = ComputerPlayer
 
-            players.append(player_class(name=name, party=party, role=role))
+            player = player_class(name=name, party=party, role=role)
+            if player.role == Role.hitler:
+                self.state.hitler = player
+
+            players.append(player)
 
         random.shuffle(players)
         return players
@@ -105,7 +115,8 @@ class Game:
             case 3:
                 player.action_investigate_loyalty(1, players=self.valid_players(exclude=player))
             case 4:
-                player.action_execution(1, players=self.valid_players(exclude=player))
+                player = player.action_execution(1, players=self.valid_players(exclude=player))
+                player.alive = False
             case 5:
                 player.action_policy_peek(1, self.policy_deck)
             case _:
@@ -119,6 +130,24 @@ class Game:
         print(
             f"\tFacist policies: {self.state.enacted_policies[Policy.fascist]} / Liberal policies: {self.state.enacted_policies[Policy.liberal]}"
         )
+
+    def check_win(self) -> Union[Tuple[Party, str], None]:
+        if self.state.enacted_policies[Policy.fascist] == FASCIST_POLICIES_WIN:
+            return Party.fascist, f"{FASCIST_POLICIES_WIN} Fascist policies were enacted."
+
+        if self.state.enacted_policies[Policy.liberal] == LIBERAL_POLICIES_WIN:
+            return Party.liberal, f"{LIBERAL_POLICIES_WIN} Liberal policies were enacted."
+
+        if (
+            self.state.enacted_policies[Policy.fascist] >= POLICIES_FOR_HITLER_CHANCELLOR
+            and self.state.chancellor.role == Role.hitler
+        ):
+            return Party.fascist, "Hitler was elected as Chancellor"
+
+        if not self.state.hitler.alive:
+            return Party.liberal, "Hitler was executed"
+
+        return None
 
     def play_game(self) -> None:
         turn_num = 0
@@ -158,6 +187,11 @@ class Game:
                 print("The government was not elected")
                 continue
 
+            if win := self.check_win():
+                party, reason = win
+                print(f"The {party}s win the game!, {reason}")
+                break
+
             # President selects policy options:
             policy_options = self.draw_policies()
             policy_proposal = self.state.president.propose_policies(self.state, policy_options)
@@ -172,10 +206,18 @@ class Game:
 
             self.state.enacted_policies[policy] += 1
 
+            if win := self.check_win():
+                party, reason = win
+                print(f"The {party}s win the game!, {reason}")
+                break
+
             # Action to be taken:
             if policy == Policy.fascist:
                 self.take_action(self.state.president)
 
+                if win := self.check_win():
+                    party, reason = win
+                    print(f"The {party}s win the game!, {reason}")
+                    break
+
             turn_num += 1
-            if turn_num > 10:
-                break

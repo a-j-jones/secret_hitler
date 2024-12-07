@@ -2,7 +2,7 @@ import datetime as dt
 from enum import StrEnum
 from typing import List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Party(StrEnum):
@@ -32,6 +32,6 @@ class Selection(BaseModel):
 
 
 class Message(BaseModel):
-    time: dt.datetime
+    time: dt.datetime = Field(default_factory=dt.datetime.now)
     author: str
     content: str
