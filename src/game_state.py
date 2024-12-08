@@ -1,38 +1,10 @@
-import datetime as dt
-from enum import StrEnum
 from typing import Dict, List
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from src.events import Event
 from src.game_types import Message, Policy
 from src.players import Player
-
-
-class EventType(StrEnum):
-    fascist_policy_played = "Fascist policy was played"
-    liberal_policy_played = "Liberal policy was played"
-    chancellor_nominated = "nominated as Chancellor"
-    chancellor_elected = "elected as Chancellor"
-    president_nominated = "nominated as President"
-    president_elected = "elected as President"
-    player_executed = "executed"
-
-
-class Event(BaseModel):
-    time: dt.datetime = Field(default_factory=dt.datetime.now)
-    event_type: EventType
-    actor: Player
-    recipient: Player = Field(default=None)
-
-    def description(self) -> str:
-        if self.actor and self.recipient:
-            return f"{self.recipient} was {self.event_type} by {self.actor}"
-
-        if self.actor:
-            return f"{self.event_type} by {self.actor}"
-
-        if self.recipient:
-            return f"{self.recipient} was {self.event_type}"
 
 
 class GameState(BaseModel):
@@ -48,6 +20,8 @@ class GameState(BaseModel):
         default_factory=lambda: {Policy.liberal: 0, Policy.fascist: 0}
     )
 
+    model_config = ConfigDict(use_enum_values=True)
+
     def elect_government(self, chancellor: Player, president: Player) -> None:
         # Elect chancellor:
         if self.chancellor:
@@ -58,3 +32,6 @@ class GameState(BaseModel):
         if self.president:
             self.previous_president = self.president
         self.president = president
+
+
+GameState.model_rebuild()

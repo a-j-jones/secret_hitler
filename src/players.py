@@ -3,10 +3,17 @@ from typing import TYPE_CHECKING, List
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.game_types import Policy, Role, Selection
+from src.events import Event, EventType
+from src.game_types import Message, Policy, Role, Selection
 
 if TYPE_CHECKING:
     from src.game_state import GameState
+
+VOTE_MAPPING = {True: EventType.vote_in_favour, False: EventType.vote_against}
+POLICY_MAPPING = {
+    Policy.fascist: EventType.fascist_policy_enacted,
+    Policy.liberal: EventType.liberal_policy_enacted,
+}
 
 
 class Player(BaseModel, ABC):
@@ -14,6 +21,7 @@ class Player(BaseModel, ABC):
     party: Policy
     role: Role
     alive: bool = Field(default=True)
+    thoughts: List[Message]
 
     model_config = ConfigDict(use_enum_values=True)
 
@@ -76,7 +84,12 @@ class TerminalPlayer(Player):
             choices=players,
         )
 
-        return players[choice_idx]
+        chosen_player = players[choice_idx]
+        game_state.event_history.append(
+            Event(event_type=EventType.chancellor_nominated, actor=self, recipient=chosen_player)
+        )
+
+        return chosen_player
 
     def vote_on_government(
         self, game_state: "GameState", president: Player, chancellor: Player
@@ -86,7 +99,12 @@ class TerminalPlayer(Player):
                 f"f\n{self.name} - Vote on government (president: {president.name}, chancellor: {chancellor.name}) [y/n]? "
             ).lower()
             if vote in ["y", "n"]:
-                return vote == "y"
+                vote_result = vote == "y"
+                game_state.event_history.append(
+                    Event(event_type=VOTE_MAPPING[vote_result], actor=self)
+                )
+                return vote_result
+
             print("Please enter 'y' or 'n'")
 
     def propose_policies(self, game_state: "GameState", policy_cards: List[Policy]) -> Selection:
@@ -106,6 +124,8 @@ class TerminalPlayer(Player):
             choices=policy_cards,
         )
         selected = [policy_cards.pop(choice_idx)]
+        game_state.event_history.append(Event(event_type=POLICY_MAPPING[selected[0]], actor=self))
+
         return Selection(selected=selected, discarded=policy_cards)
 
     def action_investigate_loyalty(self, game_state: "GameState", players: List[Player]):
@@ -116,6 +136,9 @@ class TerminalPlayer(Player):
         )
 
         player = players[choice_idx]
+        game_state.event_history.append(
+            Event(event_type=EventType.loyalty_investigated, actor=self, recipient=player)
+        )
         print(f"\n{player.name} is a {player.party}")
 
     def action_execution(self, game_state: "GameState", players: List[Player]) -> Player:
@@ -126,6 +149,9 @@ class TerminalPlayer(Player):
         )
 
         player = players[choice_idx]
+        game_state.event_history.append(
+            Event(event_type=EventType.player_executed, actor=self, recipient=player)
+        )
         print(f"\n{player.name} has been executed")
         return player
 
@@ -134,26 +160,12 @@ class TerminalPlayer(Player):
         for idx, card in enumerate(policy_cards[-3:], start=1):
             print(f"{idx} - {card}")
 
+        game_state.event_history.append(Event(event_type=EventType.policy_peek, actor=self))
+
 
 class ComputerPlayer(Player):
     def __init__(self):
         super().__init__()
 
-    def nominate_chancellor(self, game_state, valid_players):
-        print("Nominate a chancellor:")
-        for i, player in enumerate(valid_players, start=1):
-            print(f"\t{i} - {player.name}")
 
-        choice = input("Which player?")
-        choice_index = int(choice)
-
-        return valid_players[choice_index - 1]
-
-    def enact_policy(self, game_state, policy_cards):
-        return super().enact_policy(game_state, policy_cards)
-
-    def propose_policies(self, game_state, policy_cards):
-        return super().propose_policies(game_state, policy_cards)
-
-    def vote_on_government(self, game_state, president, chancellor):
-        return super().vote_on_government(game_state, president, chancellor)
+Player.model_rebuild()

@@ -116,12 +116,16 @@ class Game:
         fascist_count = self.state.enacted_policies[Policy.fascist]
         match fascist_count:
             case 3:
-                player.action_investigate_loyalty(1, players=self.valid_players(exclude=player))
+                player.action_investigate_loyalty(
+                    self.state, players=self.valid_players(exclude=player)
+                )
             case 4:
-                player = player.action_execution(1, players=self.valid_players(exclude=player))
+                player = player.action_execution(
+                    self.state, players=self.valid_players(exclude=player)
+                )
                 player.alive = False
             case 5:
-                player.action_policy_peek(1, self.policy_deck)
+                player.action_policy_peek(self.state, self.policy_deck)
             case _:
                 return
 
@@ -164,6 +168,9 @@ class Game:
             # Current state:
             print(f"\n{' NEW ROUND ':-^80}")
             self.print_gamestate()
+            if self.debug:
+                for event in self.state.event_history:
+                    print(event.description())
 
             # Nominate a chancellor:
             print("\nPresident: ", nominated_president.name)
