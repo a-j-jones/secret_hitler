@@ -1,8 +1,11 @@
 import datetime as dt
 from enum import StrEnum
-from typing import List
+from typing import TYPE_CHECKING, List
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from src.players import Player
 
 
 class Party(StrEnum):
@@ -33,5 +36,5 @@ class Selection(BaseModel):
 
 class Message(BaseModel):
     time: dt.datetime = Field(default_factory=dt.datetime.now)
-    author: str
+    author: "Player"
     content: str

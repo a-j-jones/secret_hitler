@@ -21,7 +21,7 @@ class Player(BaseModel, ABC):
     party: Policy
     role: Role
     alive: bool = Field(default=True)
-    thoughts: List[Message]
+    thoughts: List[Message] = Field(default_factory=list)
 
     model_config = ConfigDict(use_enum_values=True)
 
@@ -91,6 +91,9 @@ class TerminalPlayer(Player):
         chosen_player = players[choice_idx]
         game_state.event_history.append(
             Event(event_type=EventType.chancellor_nominated, actor=self, recipient=chosen_player)
+        )
+        game_state.public_chat.append(
+            Message(author=self, content=f"I've nominated {chosen_player.name} as chancellor")
         )
 
         return chosen_player
@@ -165,6 +168,9 @@ class TerminalPlayer(Player):
             print(f"{idx} - {card}")
 
         game_state.event_history.append(Event(event_type=EventType.policy_peek, actor=self))
+
+    def discuss(self, game_state):
+        return super().discuss(game_state)
 
 
 class ComputerPlayer(Player):
