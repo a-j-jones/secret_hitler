@@ -55,6 +55,10 @@ class Player(BaseModel, ABC):
     def action_policy_peek(self, game_state: "GameState", policies: List["Policy"]) -> None:
         pass
 
+    @abstractmethod
+    def discuss(self, game_state: "GameState") -> None:
+        pass
+
     def __str__(self) -> str:
         return self.name
 
