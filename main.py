@@ -1,4 +1,8 @@
+from dotenv import load_dotenv
+
 from src.game import Game
+
+load_dotenv()
 
 if __name__ == "__main__":
     human_players = ["Adam", "Lauren", "Ed", "Ben", "Tom", "Tegan"]

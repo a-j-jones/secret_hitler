@@ -3,7 +3,7 @@ from typing import List, Tuple, Union
 
 from src.game_state import GameState
 from src.game_types import Party, Policy, Role
-from src.players import ComputerPlayer, Player, TerminalPlayer
+from src.players import GeminiPlayer, Player, TerminalPlayer
 
 LIBERAL_POLICY_COUNT = 6
 FASCIST_POLICY_COUNT = 11
@@ -67,7 +67,7 @@ class Game:
             if name in self.human_set:
                 player_class = TerminalPlayer
             else:
-                player_class = ComputerPlayer
+                player_class = GeminiPlayer
 
             player = player_class(name=name, party=party, role=role)
             if player.role == Role.hitler:

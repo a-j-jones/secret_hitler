@@ -1,6 +1,6 @@
 import datetime as dt
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -39,3 +39,13 @@ class Event(BaseModel):
 
         if self.recipient:
             return f"{self.recipient} was {self.event_type}"
+
+
+def events_str(events: List[Event], max_events: int = 50) -> str:
+    events = sorted(events, key=lambda x: x.time)
+    string = ""
+    for event in events[-max_events:]:
+        string += "\n"
+        string += f"{event.description()}"
+
+    return string
