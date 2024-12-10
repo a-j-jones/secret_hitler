@@ -1,9 +1,8 @@
 import random
 from typing import List, Tuple, Union
 
-from src.events import events_str
 from src.game_state import GameState
-from src.game_types import Party, Policy, Role, message_str
+from src.game_types import Message, Party, Policy, Role
 from src.players import GeminiPlayer, Player, TerminalPlayer
 
 LIBERAL_POLICY_COUNT = 6
@@ -140,16 +139,27 @@ class Game:
             f"\tFacist policies: {self.state.enacted_policies[Policy.fascist]} / Liberal policies: {self.state.enacted_policies[Policy.liberal]}"
         )
 
-        print(events_str(self.state.event_history))
-
-        messages = self.state.public_chat
-        thoughts = []
+        events = self.state.event_history
+        events.extend(self.state.public_chat)
         for player in self.players:
             if player.name == "Adam":
                 main_player = player
-            thoughts.extend(player.thoughts)
+            events.extend(player.thoughts)
 
-        print(message_str(main_player, messages, thoughts))
+        log = ""
+        events = sorted(events, key=lambda x: x.time)
+        for event in events[-20:]:
+            if isinstance(event, Message):
+                chat_type = "INTERNAL THOUGHT" if event.internal else "PUBLIC CHAT"
+                if event.author == main_player:
+                    log = f"\n[{chat_type}][Myself]: {event.content}"
+                else:
+                    log = f"\n[{chat_type}][{event.author}]: {event.content}"
+
+            else:
+                log += f"\n[EVENT]: {event.description()}"
+
+        print(log)
 
     def check_win(self) -> Union[Tuple[Party, str], None]:
         if self.state.enacted_policies[Policy.fascist] == FASCIST_POLICIES_WIN:

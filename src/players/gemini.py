@@ -153,7 +153,7 @@ class GeminiPlayer(Player):
             log = "old" if event.time <= self.last_logged_message_dt else "new"
             if isinstance(event, Message):
                 chat_type = "INTERNAL THOUGHT" if event.internal else "PUBLIC CHAT"
-                if event.internal == self:
+                if event.author == self:
                     string = f"\n[{chat_type}][Myself]: {event.content}"
                 else:
                     string = f"\n[{chat_type}][{event.author}]: {event.content}"
