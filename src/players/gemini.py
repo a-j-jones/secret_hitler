@@ -121,6 +121,11 @@ class VoteDecision(TypedDict):
     selection: Vote
 
 
+class Discussion(TypedDict):
+    internal_thoughts: str
+    public_chat: str
+
+
 def create_enum_class(name: str, choices: List[Player]) -> Type[Enum]:
     return Enum(name, {f"Option{i+1}": str(i + 1) for i in range(len(choices))})
 
@@ -365,5 +370,29 @@ class GeminiPlayer(Player):
 
         self.thoughts.append(Message(author=self, internal=True, content=thought))
 
-    def discuss(self, game_state):
-        return super().discuss(game_state)
+    def discuss(self, game_state) -> None:
+        event_history = events_str(game_state.event_history)
+        chat_history = message_str(self, game_state.public_chat, self.thoughts)
+        discussion_prompt = (
+            "It is now time to discuss, you should consider any questions you might want to ask the others, or "
+            "perhaps respond to others if you have been asked, or even just speak your mind, but be aware this will be publicly broadcast "
+            "to all other players"
+        )
+
+        prompt = self.build_prompt(
+            event_history, chat_history, discussion_prompt, government_role="President"
+        )
+
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json", response_schema=Discussion
+            ),
+        )
+
+        data = json.loads(response.candidates[0].content.parts[0].text)
+        thoughts = data.get("thoughts", "")
+        public_chat = data.get("public_chat", "")
+
+        self.thoughts.append(Message(author=self, internal=True, content=thoughts))
+        game_state.public_chat.append(Message(author=self, content=public_chat))
