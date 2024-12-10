@@ -1,7 +1,7 @@
 import random
 from typing import List, Tuple, Union
 
-from events import events_str
+from src.events import events_str
 from src.game_state import GameState
 from src.game_types import Party, Policy, Role, message_str
 from src.players import GeminiPlayer, Player, TerminalPlayer
@@ -168,7 +168,7 @@ class Game:
 
         return None
 
-    def play_self(self) -> None:
+    def play_game(self) -> None:
         turn_num = 0
         while True:
             # Cycle president:
