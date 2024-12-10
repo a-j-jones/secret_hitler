@@ -28,7 +28,13 @@ class Event(BaseModel):
     actor: "Player"
     recipient: "Player" = Field(default=None)
 
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(
+        frozen=True,
+        use_enum_values=True,
+    )
+
+    def __hash__(self) -> int:
+        return hash((self.time, self.event_type, self.actor, self.recipient))
 
     def description(self) -> str:
         if self.actor and self.recipient:

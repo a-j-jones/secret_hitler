@@ -34,10 +34,10 @@ class TerminalPlayer(Player):
         )
 
         chosen_player = players[choice_idx]
-        game_state.event_history.append(
+        game_state.event_history.add(
             Event(event_type=EventType.chancellor_nominated, actor=self, recipient=chosen_player)
         )
-        game_state.public_chat.append(
+        game_state.public_chat.add(
             Message(author=self, content=f"I've nominated {chosen_player.name} as chancellor")
         )
 
@@ -52,7 +52,7 @@ class TerminalPlayer(Player):
             ).lower()
             if vote in ["y", "n"]:
                 vote_result = vote == "y"
-                game_state.event_history.append(
+                game_state.event_history.add(
                     Event(event_type=VOTE_MAPPING[vote_result], actor=self)
                 )
                 return vote_result
@@ -76,7 +76,7 @@ class TerminalPlayer(Player):
             choices=policy_cards,
         )
         selected = [policy_cards.pop(choice_idx)]
-        game_state.event_history.append(Event(event_type=POLICY_MAPPING[selected[0]], actor=self))
+        game_state.event_history.add(Event(event_type=POLICY_MAPPING[selected[0]], actor=self))
 
         return Selection(selected=selected, discarded=policy_cards)
 
@@ -88,7 +88,7 @@ class TerminalPlayer(Player):
         )
 
         player = players[choice_idx]
-        game_state.event_history.append(
+        game_state.event_history.add(
             Event(event_type=EventType.loyalty_investigated, actor=self, recipient=player)
         )
         print(f"\n{player.name} is a {player.party}")
@@ -101,7 +101,7 @@ class TerminalPlayer(Player):
         )
 
         player = players[choice_idx]
-        game_state.event_history.append(
+        game_state.event_history.add(
             Event(event_type=EventType.player_executed, actor=self, recipient=player)
         )
         print(f"\n{player.name} has been executed")
@@ -112,7 +112,7 @@ class TerminalPlayer(Player):
         for idx, card in enumerate(policy_cards[-3:], start=1):
             print(f"{idx} - {card}")
 
-        game_state.event_history.append(Event(event_type=EventType.policy_peek, actor=self))
+        game_state.event_history.add(Event(event_type=EventType.policy_peek, actor=self))
 
     def discuss(self, game_state):
         return super().discuss(game_state)

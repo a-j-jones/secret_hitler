@@ -1,6 +1,6 @@
 import datetime as dt
 from enum import StrEnum
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Set
 
 from pydantic import BaseModel, Field
 
@@ -40,19 +40,23 @@ class Message(BaseModel):
     internal: bool = Field(default=False)
     content: str
 
+    def __hash__(self) -> int:
+        return hash((self.time, self.author, self.internal, self.content))
+
 
 def message_str(
     player: "Player",
-    messages: List[Message],
-    thoughts: List[Message] = None,
+    messages: Set[Message],
+    thoughts: Set[Message] = None,
     max_messages: int = 75,
 ) -> str:
+    message_list = list(messages)
     if thoughts is not None:
-        messages.extend(thoughts)
+        message_list.extend(list(thoughts))
 
-    messages = sorted(messages, key=lambda x: x.time)
+    message_list = sorted(message_list, key=lambda x: x.time)
     string = ""
-    for message in messages[-max_messages:]:
+    for message in message_list[-max_messages:]:
         string += "\n"
         chat_type = "INTERNAL THOUGHT" if message.internal else "PUBLIC CHAT"
         if message.internal == player:

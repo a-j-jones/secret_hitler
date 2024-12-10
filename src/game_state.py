@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Set
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,8 +13,8 @@ class GameState(BaseModel):
     hitler: Player = Field(default=None)
     previous_president: Player = Field(default=None)
     previous_chancellor: Player = Field(default=None)
-    event_history: List[Event] = Field(default_factory=list)
-    public_chat: List[Message] = Field(default_factory=list)
+    event_history: Set[Event] = Field(default_factory=set)
+    public_chat: Set[Message] = Field(default_factory=set)
     players: List[Player] = Field(default_factory=list)
     failed_elections: int = Field(default=1)
     enacted_policies: Dict[Policy, int] = Field(

@@ -1,3 +1,4 @@
+import datetime as dt
 import random
 from typing import List, Tuple, Union
 
@@ -34,6 +35,7 @@ class Game:
 
         self.players = self.assign_roles(all_players)
         self.state.players = self.players
+        self.last_logged_dt = dt.datetime.now()
 
     def create_policy_deck(self) -> List[Policy]:
         policy_deck = []
@@ -139,16 +141,19 @@ class Game:
             f"\tFacist policies: {self.state.enacted_policies[Policy.fascist]} / Liberal policies: {self.state.enacted_policies[Policy.liberal]}"
         )
 
-        events = self.state.event_history
-        events.extend(self.state.public_chat)
+        events = list(self.state.event_history)
+        events.extend(list(self.state.public_chat))
         for player in self.players:
             if player.name == "Adam":
                 main_player = player
-            events.extend(player.thoughts)
+            events.extend(list(player.thoughts))
 
         log = ""
         events = sorted(events, key=lambda x: x.time)
-        for event in events[-20:]:
+        for event in events:
+            if event.time <= self.last_logged_dt:
+                continue
+
             if isinstance(event, Message):
                 chat_type = "INTERNAL THOUGHT" if event.internal else "PUBLIC CHAT"
                 if event.author == main_player:
@@ -158,6 +163,9 @@ class Game:
 
             else:
                 log += f"\n[EVENT]: {event.description()}"
+
+        if events:
+            self.last_logged_dt = events[-1].time
 
         print(log)
 
@@ -191,9 +199,6 @@ class Game:
             # Current state:
             print(f"\n{' NEW ROUND ':-^80}")
             self.print_gamestate()
-            if self.debug:
-                for event in self.state.event_history:
-                    print(event.description())
 
             # Nominate a chancellor:
             print("\nPresident: ", nominated_president.name)
@@ -255,8 +260,9 @@ class Game:
 
             if win := self.check_win():
                 party, reason = win
-                print(f"The {party}s win the game!, {reason}")
-                break
+                if reason != "Hitler was elected as Chancellor":
+                    print(f"The {party}s win the game!, {reason}")
+                    break
 
             # Action to be taken:
             if policy == Policy.fascist:
@@ -264,7 +270,8 @@ class Game:
 
                 if win := self.check_win():
                     party, reason = win
-                    print(f"The {party}s win the game!, {reason}")
-                    break
+                    if reason != "Hitler was elected as Chancellor":
+                        print(f"The {party}s win the game!, {reason}")
+                        break
 
             turn_num += 1

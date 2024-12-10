@@ -1,11 +1,11 @@
 import datetime as dt
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Set
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.events import EventType
-from src.game_types import Message, Policy, Role, Selection
+from src.game_types import Message, Party, Policy, Role, Selection
 
 if TYPE_CHECKING:
     from src.game_state import GameState
@@ -19,13 +19,16 @@ POLICY_MAPPING = {
 
 class Player(BaseModel, ABC):
     name: str
-    party: Policy
+    party: Party
     role: Role
     alive: bool = Field(default=True)
-    thoughts: List[Message] = Field(default_factory=list)
+    thoughts: Set[Message] = Field(default_factory=set)
     last_logged_message_dt: dt.datetime = Field(default_factory=dt.datetime.now)
 
     model_config = ConfigDict(use_enum_values=True)
+
+    def __hash__(self) -> int:
+        return hash((self.name,))
 
     @abstractmethod
     def nominate_chancellor(self, game_state: "GameState", players: List["Player"]) -> "Player":
