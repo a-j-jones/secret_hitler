@@ -320,25 +320,50 @@ class GeminiPlayer(Player):
         self.thoughts.append(Message(author=self, internal=True, content=investigation))
 
     def action_execution(self, game_state: "GameState", players: List[Player]) -> Player:
-        choice_idx = self.create_choice_prompt(
-            title_message=f"{self.name} - Choose a player to execute:",
-            input_message="Which player?",
+        event_history = events_str(game_state.event_history)
+        chat_history = message_str(self, game_state.public_chat, self.thoughts)
+        choice_prompt = create_choice_prompt(
+            title_message=f"{self.name}, you are the President and you must now choose a person in the game to execute:",
+            input_message="Please nominate one of the above players.",
             choices=players,
         )
 
-        player = players[choice_idx]
-        game_state.event_history.append(
-            Event(event_type=EventType.player_executed, actor=self, recipient=player)
+        prompt = self.build_prompt(
+            event_history, chat_history, choice_prompt, government_role="President"
         )
-        print(f"\n{player.name} has been executed")
-        return player
+
+        Decision = create_schema("Decision", players)
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json", response_schema=Decision
+            ),
+        )
+
+        data = json.loads(response.candidates[0].content.parts[0].text)
+        choice_idx = int(data["selection"]) - 1
+        thoughts = data.get("thoughts", "")
+
+        chosen_player = players[choice_idx]
+        game_state.event_history.append(
+            Event(event_type=EventType.chancellor_nominated, actor=self, recipient=chosen_player)
+        )
+        self.thoughts.append(Message(author=self, internal=True, content=thoughts))
+
+        print(f"Nominating {chosen_player}")
+
+        return chosen_player
 
     def action_policy_peek(self, game_state: "GameState", policy_cards: List[Policy]) -> None:
-        print("\nThe next 3 policies are:")
-        for idx, card in enumerate(policy_cards[-3:], start=1):
-            print(f"{idx} - {card}")
-
         game_state.event_history.append(Event(event_type=EventType.policy_peek, actor=self))
+
+        cards = "\n".join(
+            [f"{idx} - {card}" for idx, card in enumerate(policy_cards[-3:], start=1)]
+        )
+        thought = "I have reviewed the next 3 policies in secret, and I know with 100% confidence that the next 3 policies are:"
+        thought += cards
+
+        self.thoughts.append(Message(author=self, internal=True, content=thought))
 
     def discuss(self, game_state):
         return super().discuss(game_state)
