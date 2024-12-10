@@ -152,9 +152,9 @@ class Game:
             if isinstance(event, Message):
                 chat_type = "INTERNAL THOUGHT" if event.internal else "PUBLIC CHAT"
                 if event.author == main_player:
-                    log = f"\n[{chat_type}][Myself]: {event.content}"
+                    log += f"\n[{chat_type}][Myself]: {event.content}"
                 else:
-                    log = f"\n[{chat_type}][{event.author}]: {event.content}"
+                    log += f"\n[{chat_type}][{event.author}]: {event.content}"
 
             else:
                 log += f"\n[EVENT]: {event.description()}"

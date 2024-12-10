@@ -159,7 +159,7 @@ class GeminiPlayer(Player):
                     string = f"\n[{chat_type}][{event.author}]: {event.content}"
 
             else:
-                string += f"\n[EVENT]: {event.description()}"
+                string = f"\n[EVENT]: {event.description()}"
 
             logs[log] += string
 
@@ -167,16 +167,16 @@ class GeminiPlayer(Player):
             self.last_logged_message_dt = events[-1].time
 
         event_log = ""
-        if not (log["new"] or log["old"]):
+        if not (logs["new"] or logs["old"]):
             event_log += "\n## GAME EVENT HISTORY:\nThe game has just begun!\n"
 
-        if log["old"]:
-            event_log += f"\n## GAME EVENTS PRIOR TO LAST TURN:\n{log["old"]}\n"
+        if logs["old"]:
+            event_log += f"\n## GAME EVENTS PRIOR TO LAST TURN:\n{logs['old']}\n"
 
-        if log["new"]:
-            event_log += f"\n## GAME EVENTS SINCE LAST TURN:\n{log["new"]}\n"
+        if logs["new"]:
+            event_log += f"\n## GAME EVENTS SINCE LAST TURN:\n{logs['new']}\n"
 
-        return log
+        return event_log
 
     def build_prompt(
         self, game_state: "GameState", choice_prompt: str, government_role: str = None
