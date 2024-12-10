@@ -1,8 +1,9 @@
 import random
 from typing import List, Tuple, Union
 
+from events import events_str
 from src.game_state import GameState
-from src.game_types import Party, Policy, Role
+from src.game_types import Party, Policy, Role, message_str
 from src.players import GeminiPlayer, Player, TerminalPlayer
 
 LIBERAL_POLICY_COUNT = 6
@@ -138,6 +139,17 @@ class Game:
             f"\tFacist policies: {self.state.enacted_policies[Policy.fascist]} / Liberal policies: {self.state.enacted_policies[Policy.liberal]}"
         )
 
+        print(events_str(self.state.event_history))
+
+        messages = self.state.public_chat
+        thoughts = []
+        for player in self.players:
+            if player.name == "Adam":
+                main_player = player
+            thoughts.extend(player.thoughts)
+
+        print(message_str(main_player, messages, thoughts))
+
     def check_win(self) -> Union[Tuple[Party, str], None]:
         if self.state.enacted_policies[Policy.fascist] == FASCIST_POLICIES_WIN:
             return Party.fascist, f"{FASCIST_POLICIES_WIN} Fascist policies were enacted."
@@ -156,7 +168,7 @@ class Game:
 
         return None
 
-    def play_game(self) -> None:
+    def play_self(self) -> None:
         turn_num = 0
         while True:
             # Cycle president:
@@ -190,6 +202,7 @@ class Game:
                     p.vote_on_government(self.state, nominated_president, nominated_chancellor)
                     for p in voters
                 ]
+
             if sum(votes) > len(votes) // 2:
                 print("The government was elected successfully")
                 self.state.elect_government(

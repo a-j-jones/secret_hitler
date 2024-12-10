@@ -4,6 +4,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, List, Type
 
 import google.generativeai as genai
+from dotenv import load_dotenv
 from typing_extensions import TypedDict
 
 from src.events import Event, EventType, events_str
@@ -13,7 +14,7 @@ from src.players.base import POLICY_MAPPING, VOTE_MAPPING, Player
 if TYPE_CHECKING:
     from src.game_state import GameState
 
-
+load_dotenv()
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 model = genai.GenerativeModel("gemini-1.5-flash")
 
@@ -99,10 +100,6 @@ out who (or what!) put you in this position.
 """
 
 
-def str_append(base: str, new: str) -> str:
-    return "\n".join([base, new])
-
-
 def create_choice_prompt(
     title_message: str, input_message: str, choices: List[Player | Policy]
 ) -> str:
@@ -114,23 +111,22 @@ def create_choice_prompt(
     return "\n".join(messages)
 
 
-def build_openapi_schema(choices: List[Player | Policy]) -> dict:
-    schema = {
-        "type": "object",
-        "properties": {
-            "thoughts": {"type": "string"},
-            "selection": {"type": "integer", "minimum": 1, "maximum": len(choices)},
-        },
-        "required": ["thoughts", "selection"],
-    }
-    return schema
+class Vote(Enum):
+    y = "Y"
+    n = "N"
+
+
+class VoteDecision(TypedDict):
+    thoughts: str
+    selection: Vote
 
 
 def create_enum_class(name: str, choices: List[Player]) -> Type[Enum]:
     return Enum(name, {f"Option{i+1}": str(i + 1) for i in range(len(choices))})
 
 
-def create_typed_dict_class(name: str, selection: Type[Enum]) -> Type[TypedDict]:
+def create_schema(name: str, choices) -> Type[TypedDict]:
+    selection = create_enum_class("selection", choices)
     return TypedDict(
         name,
         {
@@ -166,7 +162,6 @@ class GeminiPlayer(Player):
     def nominate_chancellor(self, game_state: "GameState", players: List[Player]) -> Player:
         event_history = events_str(game_state.event_history)
         chat_history = message_str(self, game_state.public_chat, self.thoughts)
-
         choice_prompt = create_choice_prompt(
             title_message=f"{self.name}, you are the president and you must now nominate a chancellor:",
             input_message="Please nominate one of the above players as chancellor.",
@@ -177,14 +172,11 @@ class GeminiPlayer(Player):
             event_history, chat_history, choice_prompt, government_role="President"
         )
 
-        # Dynamically create Selection enum and Decision TypedDict
-        Selection = create_enum_class("Selection", players)
-        Decision = create_typed_dict_class("Decision", Selection)
-
+        Decision = create_schema("Decision", players)
         response = model.generate_content(
             prompt,
             generation_config=genai.GenerationConfig(
-                response_mime_type="application/json", response_schema=Decision, candidate_count=1
+                response_mime_type="application/json", response_schema=Decision
             ),
         )
 
@@ -198,58 +190,134 @@ class GeminiPlayer(Player):
         )
         self.thoughts.append(Message(author=self, internal=True, content=thoughts))
 
+        print(f"Nominating {chosen_player}")
+
         return chosen_player
 
     def vote_on_government(
         self, game_state: "GameState", president: Player, chancellor: Player
     ) -> bool:
-        while True:
-            vote = input(
-                f"f\n{self.name} - Vote on government (president: {president.name}, chancellor: {chancellor.name}) [y/n]? "
-            ).lower()
-            if vote in ["y", "n"]:
-                vote_result = vote == "y"
-                game_state.event_history.append(
-                    Event(event_type=VOTE_MAPPING[vote_result], actor=self)
-                )
-                return vote_result
+        event_history = events_str(game_state.event_history)
+        chat_history = message_str(self, game_state.public_chat, self.thoughts)
+        choice_prompt = f"f\n{self.name} - Vote on government (president: {president.name}, chancellor: {chancellor.name}) [y/n]? "
+        prompt = self.build_prompt(event_history, chat_history, choice_prompt)
 
-            print("Please enter 'y' or 'n'")
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json", response_schema=VoteDecision
+            ),
+        )
+
+        data = json.loads(response.candidates[0].content.parts[0].text)
+        vote_result = data["selection"].lower() == "y"
+        thoughts = data.get("thoughts", "")
+
+        game_state.event_history.append(Event(event_type=VOTE_MAPPING[vote_result], actor=self))
+        self.thoughts.append(Message(author=self, internal=True, content=thoughts))
+
+        return vote_result
 
     def propose_policies(self, game_state: "GameState", policy_cards: List[Policy]) -> Selection:
-        pass
-        choice_idx = self.create_choice_prompt(
+        event_history = events_str(game_state.event_history)
+        chat_history = message_str(self, game_state.public_chat, self.thoughts)
+        choice_prompt = create_choice_prompt(
             title_message=f"{self.name} - Choose policies to discard (you must discard one):",
             input_message="Which policy to discard (1-3)?",
             choices=policy_cards,
         )
 
-        discarded = [policy_cards.pop(choice_idx)]
+        prompt = self.build_prompt(
+            event_history, chat_history, choice_prompt, government_role="President"
+        )
+
+        Decision = create_schema("ProposePoliciesDecision", policy_cards)
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json", response_schema=Decision
+            ),
+        )
+
+        data = json.loads(response.candidates[0].content.parts[0].text)
+        discard_idx = int(data["selection"]) - 1
+        thoughts = data.get("thoughts", "")
+
+        discarded = [policy_cards.pop(discard_idx)]
+        self.thoughts.append(Message(author=self, internal=True, content=thoughts))
+
         return Selection(selected=policy_cards, discarded=discarded)
 
     def enact_policy(self, game_state: "GameState", policy_cards: List[Policy]) -> Policy:
-        choice_idx = self.create_choice_prompt(
+        event_history = events_str(game_state.event_history)
+        chat_history = message_str(self, game_state.public_chat, self.thoughts)
+        choice_prompt = create_choice_prompt(
             title_message=f"{self.name} - Choose a policy to enact:",
-            input_message="Which policy to discard (1-2)?",
+            input_message="Which policy to enact (1-2)?",
             choices=policy_cards,
         )
-        selected = [policy_cards.pop(choice_idx)]
+
+        prompt = self.build_prompt(
+            event_history, chat_history, choice_prompt, government_role="President"
+        )
+
+        Decision = create_schema("EnactPolicyDecision", policy_cards)
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json", response_schema=Decision
+            ),
+        )
+
+        data = json.loads(response.candidates[0].content.parts[0].text)
+        enact_idx = int(data["selection"]) - 1
+        thoughts = data.get("thoughts", "")
+
+        selected = [policy_cards.pop(enact_idx)]
         game_state.event_history.append(Event(event_type=POLICY_MAPPING[selected[0]], actor=self))
+        self.thoughts.append(Message(author=self, internal=True, content=thoughts))
 
         return Selection(selected=selected, discarded=policy_cards)
 
     def action_investigate_loyalty(self, game_state: "GameState", players: List[Player]):
-        choice_idx = self.create_choice_prompt(
-            title_message=f"{self.name} - Choose a player to investigate:",
-            input_message="Which player?",
+        event_history = events_str(game_state.event_history)
+        chat_history = message_str(self, game_state.public_chat, self.thoughts)
+        choice_prompt = create_choice_prompt(
+            title_message=f"{self.name}, you are the president and you must now choose a player to investigate:",
+            input_message="Which player would you like to check the party loyalty of?",
             choices=players,
         )
+
+        prompt = self.build_prompt(
+            event_history, chat_history, choice_prompt, government_role="President"
+        )
+
+        Decision = create_schema("Decision", players)
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json", response_schema=Decision
+            ),
+        )
+
+        data = json.loads(response.candidates[0].content.parts[0].text)
+        choice_idx = int(data["selection"]) - 1
+        thoughts = data.get("thoughts", "")
 
         player = players[choice_idx]
         game_state.event_history.append(
             Event(event_type=EventType.loyalty_investigated, actor=self, recipient=player)
         )
-        print(f"\n{player.name} is a {player.party}")
+        self.thoughts.append(Message(author=self, internal=True, content=thoughts))
+
+        investigation = f"I have investigated the party loyalty of {player.name}, and I know with certainty that they are {player.role},"
+
+        if player.party == self.party:
+            investigation += " this means that we are on the same party."
+        else:
+            investigation += " this means that we are enemies."
+
+        self.thoughts.append(Message(author=self, internal=True, content=investigation))
 
     def action_execution(self, game_state: "GameState", players: List[Player]) -> Player:
         choice_idx = self.create_choice_prompt(

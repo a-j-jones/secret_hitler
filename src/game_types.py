@@ -54,10 +54,10 @@ def message_str(
     string = ""
     for message in messages[-max_messages:]:
         string += "\n"
-        if message.author == player:
-            chat_type = "INTERNAL THOUGHT" if message.internal else "PUBLIC CHAT"
+        chat_type = "INTERNAL THOUGHT" if message.internal else "PUBLIC CHAT"
+        if message.internal == player:
             string += f"[{chat_type}][Myself]: {message.content}"
         else:
-            string += f"[PUBLIC CHAT][{message.author}]: {message.content}"
+            string += f"[{chat_type}][{message.author}]: {message.content}"
 
     return string
