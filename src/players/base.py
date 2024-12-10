@@ -1,3 +1,4 @@
+import datetime as dt
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, List
 
@@ -22,6 +23,7 @@ class Player(BaseModel, ABC):
     role: Role
     alive: bool = Field(default=True)
     thoughts: List[Message] = Field(default_factory=list)
+    last_logged_message_dt: dt.datetime = Field(default_factory=dt.datetime.now)
 
     model_config = ConfigDict(use_enum_values=True)
 

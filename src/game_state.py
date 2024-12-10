@@ -15,6 +15,7 @@ class GameState(BaseModel):
     previous_chancellor: Player = Field(default=None)
     event_history: List[Event] = Field(default_factory=list)
     public_chat: List[Message] = Field(default_factory=list)
+    players: List[Player] = Field(default_factory=list)
     failed_elections: int = Field(default=1)
     enacted_policies: Dict[Policy, int] = Field(
         default_factory=lambda: {Policy.liberal: 0, Policy.fascist: 0}

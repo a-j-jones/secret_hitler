@@ -34,6 +34,7 @@ class Game:
         self.discard_deck = []
 
         self.players = self.assign_roles(all_players)
+        self.state.players = self.players
 
     def create_policy_deck(self) -> List[Policy]:
         policy_deck = []

@@ -7,8 +7,8 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from typing_extensions import TypedDict
 
-from src.events import Event, EventType, events_str
-from src.game_types import Message, Policy, Selection, message_str
+from src.events import Event, EventType
+from src.game_types import Message, Party, Policy, Role, Selection
 from src.players.base import POLICY_MAPPING, VOTE_MAPPING, Player
 
 if TYPE_CHECKING:
@@ -142,17 +142,47 @@ def create_schema(name: str, choices) -> Type[TypedDict]:
 
 
 class GeminiPlayer(Player):
+    def build_game_log(self, game_state: "GameState", max_events: int = 150) -> str:
+        events = game_state.event_history
+        events.extend(game_state.public_chat)
+        events.extend(self.thoughts)
+        events = sorted(events, key=lambda x: x.time)
+
+        logs = {"old": "", "new": ""}
+        for event in events[-max_events:]:
+            log = "old" if event.time <= self.last_logged_message_dt else "new"
+            if isinstance(event, Message):
+                chat_type = "INTERNAL THOUGHT" if event.internal else "PUBLIC CHAT"
+                if event.internal == self:
+                    string = f"\n[{chat_type}][Myself]: {event.content}"
+                else:
+                    string = f"\n[{chat_type}][{event.author}]: {event.content}"
+
+            else:
+                string += f"\n[EVENT]: {event.description()}"
+
+            logs[log] += string
+
+        if events:
+            self.last_logged_message_dt = events[-1].time
+
+        event_log = ""
+        if not (log["new"] or log["old"]):
+            event_log += "\n## GAME EVENT HISTORY:\nThe game has just begun!\n"
+
+        if log["old"]:
+            event_log += f"\n## GAME EVENTS PRIOR TO LAST TURN:\n{log["old"]}\n"
+
+        if log["new"]:
+            event_log += f"\n## GAME EVENTS SINCE LAST TURN:\n{log["new"]}\n"
+
+        return log
+
     def build_prompt(
-        self, event_history: str, chat_history: str, choice_prompt: str, government_role: str = None
+        self, game_state: "GameState", choice_prompt: str, government_role: str = None
     ) -> str:
         prompt = BASE_PROMPT
-        if event_history:
-            prompt += f"\n## GAME EVENT HISTORY:\n{event_history}\n"
-        else:
-            prompt += "\n## GAME EVENT HISTORY:\nThe game has just begun!\n"
-
-        if chat_history:
-            prompt += f"\n## CHAT HISTORY (INCLUDING YOUR INTERNAL THOUGHTS):\n{chat_history}\n"
+        prompt += self.build_game_log(game_state)
 
         prompt += "\n## PLAYER INFO:"
         prompt += f"\nYour name: {self.name}"
@@ -160,22 +190,27 @@ class GeminiPlayer(Player):
         if government_role:
             prompt += f"\nYour current government position: {government_role}"
 
+        allies = ""
+        if self.party == Party.fascist:
+            fascists = [x for x in game_state.players if x.party == Party.fascist and x != self]
+            if self.role != Role.hitler or len(fascists) == 1:
+                allies = "Your fascist allies:"
+                for player in fascists:
+                    allies += f"\t - {player.name}"
+
+        prompt += allies
         prompt += f"\n\n## PROMPT:\n{choice_prompt}"
 
         return prompt
 
     def nominate_chancellor(self, game_state: "GameState", players: List[Player]) -> Player:
-        event_history = events_str(game_state.event_history)
-        chat_history = message_str(self, game_state.public_chat, self.thoughts)
         choice_prompt = create_choice_prompt(
             title_message=f"{self.name}, you are the president and you must now nominate a chancellor:",
             input_message="Please nominate one of the above players as chancellor.",
             choices=players,
         )
 
-        prompt = self.build_prompt(
-            event_history, chat_history, choice_prompt, government_role="President"
-        )
+        prompt = self.build_prompt(game_state, choice_prompt, government_role="President")
 
         Decision = create_schema("Decision", players)
         response = model.generate_content(
@@ -202,10 +237,8 @@ class GeminiPlayer(Player):
     def vote_on_government(
         self, game_state: "GameState", president: Player, chancellor: Player
     ) -> bool:
-        event_history = events_str(game_state.event_history)
-        chat_history = message_str(self, game_state.public_chat, self.thoughts)
         choice_prompt = f"f\n{self.name} - Vote on government (president: {president.name}, chancellor: {chancellor.name}) [y/n]? "
-        prompt = self.build_prompt(event_history, chat_history, choice_prompt)
+        prompt = self.build_prompt(game_state, choice_prompt)
 
         response = model.generate_content(
             prompt,
@@ -224,17 +257,13 @@ class GeminiPlayer(Player):
         return vote_result
 
     def propose_policies(self, game_state: "GameState", policy_cards: List[Policy]) -> Selection:
-        event_history = events_str(game_state.event_history)
-        chat_history = message_str(self, game_state.public_chat, self.thoughts)
         choice_prompt = create_choice_prompt(
             title_message=f"{self.name} - Choose policies to discard (you must discard one):",
             input_message="Which policy to discard (1-3)?",
             choices=policy_cards,
         )
 
-        prompt = self.build_prompt(
-            event_history, chat_history, choice_prompt, government_role="President"
-        )
+        prompt = self.build_prompt(game_state, choice_prompt, government_role="President")
 
         Decision = create_schema("ProposePoliciesDecision", policy_cards)
         response = model.generate_content(
@@ -254,17 +283,13 @@ class GeminiPlayer(Player):
         return Selection(selected=policy_cards, discarded=discarded)
 
     def enact_policy(self, game_state: "GameState", policy_cards: List[Policy]) -> Policy:
-        event_history = events_str(game_state.event_history)
-        chat_history = message_str(self, game_state.public_chat, self.thoughts)
         choice_prompt = create_choice_prompt(
             title_message=f"{self.name} - Choose a policy to enact:",
             input_message="Which policy to enact (1-2)?",
             choices=policy_cards,
         )
 
-        prompt = self.build_prompt(
-            event_history, chat_history, choice_prompt, government_role="President"
-        )
+        prompt = self.build_prompt(game_state, choice_prompt, government_role="President")
 
         Decision = create_schema("EnactPolicyDecision", policy_cards)
         response = model.generate_content(
@@ -285,17 +310,13 @@ class GeminiPlayer(Player):
         return Selection(selected=selected, discarded=policy_cards)
 
     def action_investigate_loyalty(self, game_state: "GameState", players: List[Player]):
-        event_history = events_str(game_state.event_history)
-        chat_history = message_str(self, game_state.public_chat, self.thoughts)
         choice_prompt = create_choice_prompt(
             title_message=f"{self.name}, you are the president and you must now choose a player to investigate:",
             input_message="Which player would you like to check the party loyalty of?",
             choices=players,
         )
 
-        prompt = self.build_prompt(
-            event_history, chat_history, choice_prompt, government_role="President"
-        )
+        prompt = self.build_prompt(game_state, choice_prompt, government_role="President")
 
         Decision = create_schema("Decision", players)
         response = model.generate_content(
@@ -325,17 +346,13 @@ class GeminiPlayer(Player):
         self.thoughts.append(Message(author=self, internal=True, content=investigation))
 
     def action_execution(self, game_state: "GameState", players: List[Player]) -> Player:
-        event_history = events_str(game_state.event_history)
-        chat_history = message_str(self, game_state.public_chat, self.thoughts)
         choice_prompt = create_choice_prompt(
             title_message=f"{self.name}, you are the President and you must now choose a person in the game to execute:",
             input_message="Please nominate one of the above players.",
             choices=players,
         )
 
-        prompt = self.build_prompt(
-            event_history, chat_history, choice_prompt, government_role="President"
-        )
+        prompt = self.build_prompt(game_state, choice_prompt, government_role="President")
 
         Decision = create_schema("Decision", players)
         response = model.generate_content(
@@ -371,17 +388,13 @@ class GeminiPlayer(Player):
         self.thoughts.append(Message(author=self, internal=True, content=thought))
 
     def discuss(self, game_state) -> None:
-        event_history = events_str(game_state.event_history)
-        chat_history = message_str(self, game_state.public_chat, self.thoughts)
         discussion_prompt = (
             "It is now time to discuss, you should consider any questions you might want to ask the others, or "
             "perhaps respond to others if you have been asked, or even just speak your mind, but be aware this will be publicly broadcast "
             "to all other players"
         )
 
-        prompt = self.build_prompt(
-            event_history, chat_history, discussion_prompt, government_role="President"
-        )
+        prompt = self.build_prompt(game_state, discussion_prompt, government_role="President")
 
         response = model.generate_content(
             prompt,
