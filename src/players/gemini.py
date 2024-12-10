@@ -98,6 +98,22 @@ appointing/assassinating.
 three possible culprits: The President, the
 Chancellor, or the Policy Deck. Try to figure
 out who (or what!) put you in this position.
+
+## IMPORTANT:
+It is very important that you always record your internal thoughts
+to make sure that you can refer back to what you were thinking
+at the time.
+
+Don't be too analytical, you should be enjoying a casual
+game with friends, but trying to figure out who belongs
+to which party.
+
+This is a party game, not a real life situation so 
+you should treat it as such and ask questions in a 
+manner that makes sense at a gathering
+
+Everyone will get to play each role at some point during
+the evening, and everyone will be President/Chancellor during a game.
 """
 
 
@@ -230,7 +246,8 @@ class GeminiPlayer(Player):
             Event(event_type=EventType.chancellor_nominated, actor=self, recipient=chosen_player)
         )
         time.sleep(0.01)
-        self.thoughts.add(Message(author=self, internal=True, content=thoughts))
+        thought = Message(author=self, internal=True, content=thoughts)
+        self.thoughts.add(thought)
 
         print(f"Nominating {chosen_player}")
 
@@ -255,7 +272,8 @@ class GeminiPlayer(Player):
 
         game_state.event_history.add(Event(event_type=VOTE_MAPPING[vote_result], actor=self))
         time.sleep(0.01)
-        self.thoughts.add(Message(author=self, internal=True, content=thoughts))
+        thought = Message(author=self, internal=True, content=thoughts)
+        self.thoughts.add(thought)
 
         return vote_result
 
@@ -281,7 +299,8 @@ class GeminiPlayer(Player):
         thoughts = data.get("thoughts", "")
 
         discarded = [policy_cards.pop(discard_idx)]
-        self.thoughts.add(Message(author=self, internal=True, content=thoughts))
+        thought = Message(author=self, internal=True, content=thoughts)
+        self.thoughts.add(thought)
 
         return Selection(selected=policy_cards, discarded=discarded)
 
@@ -309,7 +328,8 @@ class GeminiPlayer(Player):
         selected = [policy_cards.pop(enact_idx)]
         game_state.event_history.add(Event(event_type=POLICY_MAPPING[selected[0]], actor=self))
         time.sleep(0.01)
-        self.thoughts.add(Message(author=self, internal=True, content=thoughts))
+        thought = Message(author=self, internal=True, content=thoughts)
+        self.thoughts.add(thought)
 
         return Selection(selected=selected, discarded=policy_cards)
 
@@ -339,7 +359,8 @@ class GeminiPlayer(Player):
             Event(event_type=EventType.loyalty_investigated, actor=self, recipient=player)
         )
         time.sleep(0.01)
-        self.thoughts.add(Message(author=self, internal=True, content=thoughts))
+        thought = Message(author=self, internal=True, content=thoughts)
+        self.thoughts.add(thought)
 
         investigation = f"I have investigated the party loyalty of {player.name}, and I know with certainty that they are {player.role},"
 
@@ -349,7 +370,8 @@ class GeminiPlayer(Player):
             investigation += " this means that we are enemies."
 
         time.sleep(0.01)
-        self.thoughts.add(Message(author=self, internal=True, content=investigation))
+        thought = Message(author=self, internal=True, content=investigation)
+        self.thoughts.add(thought)
 
     def action_execution(self, game_state: "GameState", players: List[Player]) -> Player:
         choice_prompt = create_choice_prompt(
@@ -377,7 +399,8 @@ class GeminiPlayer(Player):
             Event(event_type=EventType.chancellor_nominated, actor=self, recipient=chosen_player)
         )
         time.sleep(0.01)
-        self.thoughts.add(Message(author=self, internal=True, content=thoughts))
+        thought = Message(author=self, internal=True, content=thoughts)
+        self.thoughts.add(thought)
 
         print(f"Nominating {chosen_player}")
 
@@ -389,19 +412,21 @@ class GeminiPlayer(Player):
         cards = "\n".join(
             [f"{idx} - {card}" for idx, card in enumerate(policy_cards[-3:], start=1)]
         )
-        thought = "I have reviewed the next 3 policies in secret, and I know with 100% confidence that the next 3 policies are:"
-        thought += cards
+        thought_str = "I have reviewed the next 3 policies in secret, and I know with 100% confidence that the next 3 policies are:"
+        thought_str += cards
 
-        self.thoughts.add(Message(author=self, internal=True, content=thought))
+        thought = Message(author=self, internal=True, content=thought_str)
+        self.thoughts.add(thought)
 
-    def discuss(self, game_state) -> None:
+    def discuss(self, game_state: "GameState", prompt: str) -> None:
         discussion_prompt = (
             "It is now time to discuss, you should consider any questions you might want to ask the others, or "
             "perhaps respond to others if you have been asked, or even just speak your mind, but be aware this will be publicly broadcast "
             "to all other players"
         )
+        discussion_prompt += prompt
 
-        prompt = self.build_prompt(game_state, discussion_prompt, government_role="President")
+        prompt = self.build_prompt(game_state, discussion_prompt)
 
         response = model.generate_content(
             prompt,
@@ -414,6 +439,7 @@ class GeminiPlayer(Player):
         thoughts = data.get("thoughts", "")
         public_chat = data.get("public_chat", "")
 
-        self.thoughts.add(Message(author=self, internal=True, content=thoughts))
+        thought = Message(author=self, internal=True, content=thoughts)
+        self.thoughts.add(thought)
         time.sleep(0.01)
         game_state.public_chat.add(Message(author=self, content=public_chat))

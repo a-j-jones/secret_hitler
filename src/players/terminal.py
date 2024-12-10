@@ -26,6 +26,35 @@ def get_choice_idx(title_message: str, input_message: str, choices: List[Player 
 
 
 class TerminalPlayer(Player):
+    def build_latest_chat(self, game_state) -> str:
+        events = list(game_state.event_history)
+        events.extend(list(game_state.public_chat))
+        events = sorted(events, key=lambda x: x.time)
+
+        logs = {"old": "", "new": ""}
+        for event in events:
+            log = "old" if event.time <= self.last_logged_message_dt else "new"
+            if isinstance(event, Message):
+                chat_type = "INTERNAL THOUGHT" if event.internal else "PUBLIC CHAT"
+                if event.author == self:
+                    string = f"\n[{chat_type}][Myself]: {event.content}"
+                else:
+                    string = f"\n[{chat_type}][{event.author}]: {event.content}"
+
+            else:
+                string = f"\n[EVENT]: {event.description()}"
+
+            logs[log] += string
+
+        if events:
+            self.last_logged_message_dt = events[-1].time
+
+        event_log = ""
+        if logs["new"]:
+            event_log += f"\n## GAME EVENTS SINCE LAST TURN:\n{logs['new']}\n"
+
+        return event_log
+
     def nominate_chancellor(self, game_state: "GameState", players: List[Player]) -> Player:
         choice_idx = get_choice_idx(
             title_message=f"{self.name} - Nominate a chancellor:",
@@ -114,5 +143,9 @@ class TerminalPlayer(Player):
 
         game_state.event_history.add(Event(event_type=EventType.policy_peek, actor=self))
 
-    def discuss(self, game_state):
-        return super().discuss(game_state)
+    def discuss(self, game_state: "GameState", prompt: str) -> None:
+        chat = self.build_latest_chat(game_state)
+        chat += f"\{prompt}"
+        print(chat)
+        response = input("What would you like to say? ")
+        game_state.public_chat.add(Message(author=self, content=response))

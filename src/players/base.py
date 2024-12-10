@@ -61,7 +61,7 @@ class Player(BaseModel, ABC):
         pass
 
     @abstractmethod
-    def discuss(self, game_state: "GameState") -> None:
+    def discuss(self, game_state: "GameState", prompt: str) -> None:
         pass
 
     def __str__(self) -> str:

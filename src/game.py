@@ -141,6 +141,8 @@ class Game:
             f"\tFacist policies: {self.state.enacted_policies[Policy.fascist]} / Liberal policies: {self.state.enacted_policies[Policy.liberal]}"
         )
 
+        return
+
         events = list(self.state.event_history)
         events.extend(list(self.state.public_chat))
         for player in self.players:
@@ -187,6 +189,10 @@ class Game:
 
         return None
 
+    def discuss_game(self, prompt: str) -> None:
+        for player in self.players:
+            player.discuss(self.state, prompt)
+
     def play_game(self) -> None:
         turn_num = 0
         while True:
@@ -207,6 +213,9 @@ class Game:
                 self.valid_chancellors(
                     nominated_president, self.state.president, self.state.chancellor
                 ),
+            )
+            self.discuss_game(
+                prompt="What do you think about the nomination, should this person be chancellor?"
             )
 
             # Vote in the current government:
@@ -229,7 +238,7 @@ class Game:
                 self.state.failed_elections += 1
                 if self.state.failed_elections == 3:
                     self.state.failed_elections = 0
-                    policy = self.draw_policies(amount=1)
+                    policy = self.draw_policies(amount=1)[0]
                     self.state.enacted_policies[policy] += 1
 
                     if win := self.check_win():
@@ -237,6 +246,9 @@ class Game:
                         print(f"The {party}s win the game!, {reason}")
                         break
 
+                self.discuss_game(
+                    prompt="The government failed to be elected, how should we proceed?"
+                )
                 continue
 
             if win := self.check_win():
@@ -264,6 +276,10 @@ class Game:
                     print(f"The {party}s win the game!, {reason}")
                     break
 
+            self.discuss_game(
+                prompt="What do you think about the card that was played? Was this a deliberate action, or were they forced to play that card?"
+            )
+
             # Action to be taken:
             if policy == Policy.fascist:
                 self.take_action(self.state.president)
@@ -273,5 +289,9 @@ class Game:
                     if reason != "Hitler was elected as Chancellor":
                         print(f"The {party}s win the game!, {reason}")
                         break
+
+                self.discuss_game(
+                    prompt="Do we have anything to discuss after this action has taken place?"
+                )
 
             turn_num += 1
